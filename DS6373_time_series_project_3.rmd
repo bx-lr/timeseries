@@ -1,0 +1,371 @@
+---
+title: 'Time Series Project EDA: Fall 2022'
+output:
+  pdf_document: default
+  html_document: default
+  word_document: default
+date: '2022-11-19'
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r message=FALSE, warning=FALSE}
+library(tswge)
+library(GGally)
+library(tidyverse)
+library(ggplot2)
+library(tseries)
+library(vars)
+library(forecast)
+library(dplyr)
+library(urca)
+library(orcutt)
+```
+
+## Group Members
+Gowthan Katta
+Josh Mitchell
+
+
+## Data Description
+The data set consists of stock data between 2006-01-03 and 2022-11-14. The data was collected from 29 stocks and contains 123163 observagtions. The PerChange and PerSwing variables were generated from the data and Close was chosen as the response. No NA values were observed in the data set. Descriptions of the 10 variables contained within the data set are outlined below. 
+
+  Date - In format: yyyy-mm-dd
+  High - Highest price reached in the day in USD
+  Low - Lowest price reached in the day in USD
+  Open - Price of the stock at market open in USD
+  Close - Price of the stock at market close in USD
+  Volume - Number of shares traded
+  Adj.Close - Closing price adjusted for splits and dividend distributions
+  Name - Stock ticker name (29 different stocks)
+  PerChange - Percentage change in stock price between Open and Close. 
+  PerSwing - Percentage change in stock price between High and Low. 
+
+As shown in the pair plots below, the explanatory variables High, Low, Open, Close, and Adj.Close are all highly correlated with each other. Additionally, when investigating the pair plots, different stock tickers appear to have different distributions of the data across the explanatory variables. This appears indicate that separate models (one for each stock ticker) may be appropriate. 
+
+```{r message=FALSE, warning=FALSE}
+data  = read.csv('data/all_stocks_2006-01-01_to_2022-11-14.csv')
+head(data)
+tail(data)
+dim(data) # 123163 observations across 8 explanatory variables
+data <- drop_na(data) # no NA values 
+dim(data) # 123163 observations across 8 explanatory variables
+data["PerChange"] = ((data$Close - data$Open) / data$Open) * 100 # new variable
+data["PerSwing"] = ((data$High - data$Low) / data$Low) * 100 # new variable
+col_names = names(data)
+good_names = c("High","Low","Open","Close","Volume","Adj.Close","PerChange","PerSwing")
+tickers <- levels(as.factor(data$Name))
+
+for (ticker in as.character(tickers)){
+  print(data[data$Name == ticker, ] %>% ggpairs(columns=good_names, title=paste('Pair Plot for ticker: ',ticker)))
+}
+
+```
+
+## Stationarity Check
+
+The data for High, Low, Open, Close, Adj.Close, and Volume shows non-cyclic wandering behavior with strong correlation between data values that are near each other in time. PerChange indicates a negative autocorrelation at lag 1, and PerSwing shows slowly damping autocorrelations with possible cyclic components. PerChange appears non-stationary due to violations of the constant autocorrelations assumption. PerSwing appears non-stationary due to slowly damping autocorrelations. 
+
+```{r message=FALSE, warning=FALSE}
+# investigate the AAPL stock ticker
+aapl <- data[data$Name == c('AAPL'),]
+aapl <- aapl[ , -which(names(aapl) %in% c("Name"))]
+
+# High, Low, Open, Close, Adj.Close, and Volume all have very similar ACF and spectral density
+
+# High stationarity check 
+# Violation of condition 1 (mean appears dependent on time) 
+plotts.sample.wge(aapl$High)
+acf(aapl$High, plot=T)
+acf(aapl$High[1:length(aapl$High)/2], plot=T)
+acf(aapl$High[((length(aapl$High)/2)+1):length(aapl$High)], plot=T)
+adf.test(aapl$High) # ftr (non-stationary)
+
+# Low stationarity check 
+# Violation of condition 1 (mean appears dependent on time) 
+plotts.sample.wge(aapl$Low)
+acf(aapl$Low, plot=T)
+acf(aapl$Low[1:length(aapl$Low)/2], plot=T)
+acf(aapl$Low[((length(aapl$Low)/2)+1):length(aapl$Low)], plot=T)
+adf.test(aapl$Low) # ftr (non-stationary)
+
+# Open stationarity check 
+# Violation of condition 1 (mean appears dependent on time) 
+plotts.sample.wge(aapl$Open)
+acf(aapl$Open, plot=T)
+acf(aapl$Open[1:length(aapl$Open)/2], plot=T)
+acf(aapl$Open[((length(aapl$Open)/2)+1):length(aapl$Open)], plot=T)
+adf.test(aapl$Open) # ftr (non-stationary)
+
+# Close stationarity check 
+# Violation of condition 1 (mean appears dependent on time) 
+plotts.sample.wge(aapl$Close)
+acf(aapl$Close, plot=T)
+acf(aapl$Close[1:length(aapl$Close)/2], plot=T)
+acf(aapl$Close[((length(aapl$Close)/2)+1):length(aapl$Close)], plot=T)
+adf.test(aapl$Close) # ftr (non-stationary)
+
+# Adj.Close stationarity check 
+# Violation of condition 1 (mean appears dependent on time) 
+plotts.sample.wge(aapl$Adj.Close)
+acf(aapl$Adj.Close, plot=T)
+acf(aapl$Adj.Close[1:length(aapl$Adj.Close)/2], plot=T)
+acf(aapl$Adj.Close[((length(aapl$Adj.Close)/2)+1):length(aapl$Adj.Close)], plot=T)
+adf.test(aapl$Adj.Close)# ftr (non-stationary)
+
+# Volume stationarity check 
+# Violation of condition 1 (mean appears dependent on time) 
+plotts.sample.wge(aapl$Volume)
+acf(aapl$Volume, plot=T)
+acf(aapl$Volume[1:length(aapl$Volume)/2], plot=T)
+acf(aapl$Volume[((length(aapl$Volume)/2)+1):length(aapl$Volume)], plot=T)
+adf.test(aapl$Volume) # falsely rejects Ho
+
+# percentage change stationarity check 
+plotts.sample.wge(aapl$PerChange)
+acf(aapl$PerChange, plot=T)
+# violation of constant autocorrelations
+acf(aapl$PerChange[1:length(aapl$PerChange)/2], plot=T)
+acf(aapl$PerChange[((length(aapl$PerChange)/2)+1):length(aapl$PerChange)], plot=T)
+adf.test(aapl$PerChange) # falsely rejects Ho
+
+# percentage swing stationarity check 
+plotts.sample.wge(aapl$PerSwing)
+acf(aapl$PerSwing, plot=T)
+acf(aapl$PerSwing[1:length(aapl$PerSwing)/2], plot=T)
+acf(aapl$PerSwing[((length(aapl$PerSwing)/2)+1):length(aapl$PerSwing)], plot=T)
+adf.test(aapl$PerSwing) # falsely rejects Ho
+```
+
+## Model 1: ARIMA(5,1,1) - Restricted to last 365-day
+Top model is ARIMA(5,1,1). We factored out a 1-B term and performed a Dicky-Fuller test which suggested the data was stationary. Next, we selected the top models using the AIC and BIC. Each model was tested with the Ljung-Box test for whiteness of the residuals.  Afterwards, we calculated the rolling window RMSE for each model with both long and short term forecasts. The rolling window RMSE identified the ARIMA(5,1,1) model as performing the best. Inspecting the results, we generated a realization from the ARIMA(5,1,1) and compared it to the 365 day realization from the data set. Finally, we generated 5 and 30 day forecasts from the model.    
+
+```{r message=FALSE, warning=FALSE}
+# re read the data because r is dumb
+data  = read.csv('data/all_stocks_2006-01-01_to_2022-11-14.csv')
+head(data)
+tail(data)
+dim(data) # 123163 observations across 8 explanatory variables
+data <- drop_na(data) # no NA values 
+dim(data) # 123163 observations across 8 explanatory variables
+data["PerChange"] = ((data$Close - data$Open) / data$Open) * 100 # new variable
+data["PerSwing"] = ((data$High - data$Low) / data$Low) * 100 # new variable
+col_names = names(data)
+good_names = c("High","Low","Open","Close","Volume","Adj.Close","PerChange","PerSwing")
+tickers <- levels(as.factor(data$Name))
+
+# investigate the AAPL stock ticker
+aapl <- data[data$Name == c('AAPL'),]
+aapl <- aapl[ , -which(names(aapl) %in% c("Name"))]
+
+#plotts.sample.wge(aapl$Close)
+slice = aapl$Close[(length(aapl$Close)-364):length(aapl$Close)]
+# take out 1-b
+plotts.sample.wge(slice)
+d1 = artrans.wge(slice, phi.tr=1)
+acf(d1)
+# inspect plots for stationarity
+adf.test(d1) # dicky-fuller rejects null, suggesting stationary
+
+# smallest AIC is 2.209449 with arma(6,3)
+#6,3 - 2.209449	
+#7,3 - 2.212574	
+#5,1 - 2.213120	
+#10,2 - 2.215767	
+#4,5 - 2.216730	
+aic5.wge(d1, p=0:12, q=0:5) 
+aic5.wge(d1, p=0:12, q=0:5,type='bic')# 0,0; 0,1; 1,0; 1,1; 2,0
+
+est.ar.wge(d1, p=12, method='burg') # over fit 
+x63 = est.arma.wge(d1, p=6,q=3)
+x73 = est.arma.wge(d1, p=7,q=3)
+x51 = est.arma.wge(d1, p=5,q=1)
+x102 = est.arma.wge(d1, p=10,q=2)
+x45 = est.arma.wge(d1, p=4,q=5)
+x121 =est.arma.wge(d3, p=12,q=1)
+
+
+plot(x63$res, type='p') # inspect residuals for white noise
+ljung.wge(x63$res, p=6,q=3) # p-values for ljung-box test indicate residuals are sufficiently whitened
+ljung.wge(x63$res, p=6,q=3, K=48)
+
+plot(x73$res, type='p') # inspect residuals for white noise
+ljung.wge(x73$res, p=6,q=3) # p-values for ljung-box test indicate residuals are sufficiently whitened
+ljung.wge(x73$res, p=6,q=3, K=48)
+
+plot(x51$res, type='p') # inspect residuals for white noise
+ljung.wge(x51$res, p=6,q=3) # p-values for ljung-box test indicate residuals are sufficiently whitened
+ljung.wge(x51$res, p=6,q=3, K=48)
+
+plot(x102$res, type='p') # inspect residuals for white noise
+ljung.wge(x102$res, p=6,q=3) # p-values for ljung-box test indicate residuals are sufficiently whitened
+ljung.wge(x102$res, p=6,q=3, K=48)
+
+plot(x45$res, type='p') # inspect residuals for white noise
+ljung.wge(x45$res, p=6,q=3) # p-values for ljung-box test indicate residuals are sufficiently whitened
+ljung.wge(x45$res, p=6,q=3, K=48)
+
+
+# forecasting Close 5 days in the future (best rmse 3.73 on arma(5,1))
+roll.win.rmse.wge(slice, horizon=5, s=0, d=1,phi=x63$phi, theta = x63$theta) # rmse 6.151
+roll.win.rmse.wge(slice, horizon=5, s=0, d=1,phi=x73$phi, theta = x73$theta) # rmse 5.676
+roll.win.rmse.wge(slice, horizon=5, s=0, d=1,phi=x51$phi, theta = x51$theta) # rmse 4.455
+roll.win.rmse.wge(slice, horizon=5, s=0, d=1,phi=x102$phi, theta = x102$theta) # rmse 5.649
+roll.win.rmse.wge(slice, horizon=5, s=0, d=1,phi=x45$phi, theta = x45$theta) # rmse 4.864
+fore_short = fore.arima.wge(slice, phi=x51$phi, theta = x51$theta, s=0, d=1, n.ahead=5, lastn=T, plot=T, limits=T)
+fore_5day_ASE = mean((slice[361:365] - fore_short$f)^2)
+fore_5day_ASE # 57.6851
+
+# forecasting Close 30 days in the future (rmse 10.184)
+roll.win.rmse.wge(slice, horizon=30, s=0, d=1,phi=x63$phi, theta = x63$theta) # rmse 10.678
+roll.win.rmse.wge(slice, horizon=30, s=0, d=1,phi=x73$phi, theta = x73$theta) # rmse 10.521
+roll.win.rmse.wge(slice, horizon=30, s=0, d=1,phi=x51$phi, theta = x51$theta) # rmse 10.184
+roll.win.rmse.wge(slice, horizon=30, s=0, d=1,phi=x102$phi, theta = x102$theta) # rmse 10.259
+roll.win.rmse.wge(slice, horizon=30, s=0, d=1,phi=x45$phi, theta = x45$theta) # rmse 10.283
+fore_long = fore.arima.wge(slice, phi=x51$phi, theta = x51$theta, s=0, d=1, n.ahead=30, lastn=T, plot=T, limits=T)
+fore_30_ASE = mean((slice[336:365] - fore_long$f)^2)
+fore_30_ASE # 33.13971
+
+# generating data and comparing to original shows similar structure 
+plotts.sample.wge(d1)
+plotts.sample.wge(gen.arma.wge(n=365, phi=x51$phi, theta = x51$theta, mu=x51$xbar, vara=x51$avar, sn=2))
+
+x51
+#$phi
+#[1] -0.91728222 -0.08587382 -0.09547011 -0.01902451  0.08470061
+#$theta
+#[1] -0.9326259
+#$avar
+#[1] 8.799178
+
+# forecasts for 5 and 30 days into the future
+fore.arima.wge(slice, phi=x51$phi, theta = x51$theta, s=0, d=1, n.ahead=5, lastn=F, plot=T, limits=T)
+fore.arima.wge(slice, phi=x51$phi, theta = x51$theta, s=0, d=1, n.ahead=30, lastn=F, plot=T, limits=T)
+```
+## Model 2: ARMA(10,5) - Utilizing All Days
+ 
+
+```{r message=FALSE, warning=FALSE}
+
+# re read the data because r is dumb
+data  = read.csv('data/all_stocks_2006-01-01_to_2022-11-14.csv')
+head(data)
+tail(data)
+dim(data) # 123163 observations across 8 explanatory variables
+data <- drop_na(data) # no NA values 
+dim(data) # 123163 observations across 8 explanatory variables
+data["PerChange"] = ((data$Close - data$Open) / data$Open) * 100 # new variable
+data["PerSwing"] = ((data$High - data$Low) / data$Low) * 100 # new variable
+col_names = names(data)
+good_names = c("High","Low","Open","Close","Volume","Adj.Close","PerChange","PerSwing")
+tickers <- levels(as.factor(data$Name))
+
+# investigate the AAPL stock ticker
+aapl <- data[data$Name == c('AAPL'),]
+aapl <- aapl[ , -which(names(aapl) %in% c("Name"))]
+# convert the data to timeseries object
+aapl.ts <- as.ts(aapl$Close)
+
+# visualize the realization
+plotts.wge(aapl.ts)
+acf(aapl.ts)
+
+# look at aic, bic, and bicc models
+aic5.wge(aapl.ts)
+aic5.wge(aapl.ts, type = 'bic')
+aic5.wge(aapl.ts, type = 'aicc')
+
+aapl$index <- 1:nrow(aapl)
+
+# OLS: time appears to be significant (rejected the null)
+fit = lm(Close~index, data = aapl)
+summary(fit)
+
+# Cochrane-Orcutt: time does NOT appear to be significant (failed to reject the null)
+# Small chance (or evidence of a deterministic trend in the data)
+cfit = cochrane.orcutt(fit)
+summary(cfit)
+
+
+aic.wge(aapl.ts, p = 0:10, q = 0:5)
+aic5.wge(aapl.ts, p = 0:10, q = 0:5)
+
+
+
+aapl.ts2 = aapl.ts[(length(aapl.ts)-364):length(aapl.ts)]
+#aapl.ts
+#aapl.ts2
+
+
+aapl.pred1 = fore.arma.wge(aapl.ts, phi = c(-0.322309522, 1.057487180, -0.055477750, -0.844429717, 0.488404731, 0.610026678, -0.002045086, -0.002878810, 0.046165984, 0.024858653), 
+                           theta = c(-1.2731792, -0.1666368, -0.2501280, -1.1441992, -0.6634130), n.ahead = 5, lastn = T, limits = F)
+
+aapl.pred1.1 <- fore.arma.wge(aapl.ts, phi = c(-0.322309522, 1.057487180, -0.055477750, -0.844429717, 0.488404731, 0.610026678, -0.002045086, -0.002878810, 0.046165984, 0.024858653), 
+                           theta = c(-1.2731792, -0.1666368, -0.2501280, -1.1441992, -0.6634130), n.ahead = 5, lastn = F, limits = T)
+
+
+ASE1 = mean((aapl.pred1$f - aapl.ts2[361:365])^2)
+ASE1 #53.289
+
+
+aapl.pred2 = fore.arma.wge(aapl.ts, phi = c(-0.322309522, 1.057487180, -0.055477750, -0.844429717, 0.488404731, 0.610026678, -0.002045086, -0.002878810, 0.046165984, 0.024858653), 
+                           theta = c(-1.2731792, -0.1666368, -0.2501280, -1.1441992, -0.6634130), n.ahead = 30, lastn = T, limits = F)
+
+aapl.pred2.1 = fore.arma.wge(aapl.ts, phi = c(-0.322309522, 1.057487180, -0.055477750, -0.844429717, 0.488404731, 0.610026678, -0.002045086, -0.002878810, 0.046165984, 0.024858653), 
+                           theta = c(-1.2731792, -0.1666368, -0.2501280, -1.1441992, -0.6634130), n.ahead = 30, lastn = F, limits = T)
+
+ASE2 = mean((aapl.pred2$f - aapl.ts[336:365])^2)
+ASE2 #71.685
+
+
+#1.079
+roll.win.rmse.wge(aapl.ts, horizon = 5, d=0, phi = c(-0.322309522, 1.057487180, -0.055477750, -0.844429717, 0.488404731, 0.610026678, -0.002045086, -0.002878810, 0.046165984, 0.024858653), 
+                  theta = c(-1.2731792, -0.1666368, -0.2501280, -1.1441992, -0.6634130))
+
+#2.605
+roll.win.rmse.wge(aapl.ts, horizon = 30, d=0, phi = c(-0.322309522, 1.057487180, -0.055477750, -0.844429717, 0.488404731, 0.610026678, -0.002045086, -0.002878810, 0.046165984, 0.024858653), 
+                  theta = c(-1.2731792, -0.1666368, -0.2501280, -1.1441992, -0.6634130))
+
+
+
+aapl.ts2 = aapl.ts[(length(aapl.ts)-364):length(aapl.ts)]
+aapl.ts2 = aapl.ts[(length(aapl.ts)-364):length(aapl.ts)]
+
+
+aapl.pred1 = fore.arma.wge(aapl.ts2, phi = c(-0.322309522, 1.057487180, -0.055477750, -0.844429717, 0.488404731, 0.610026678, -0.002045086, -0.002878810, 0.046165984, 0.024858653), 
+                           theta = c(-1.2731792, -0.1666368, -0.2501280, -1.1441992, -0.6634130), n.ahead = 5, lastn = T, limits = F)
+
+aapl.pred1.1 <- fore.arma.wge(aapl.ts2, phi = c(-0.322309522, 1.057487180, -0.055477750, -0.844429717, 0.488404731, 0.610026678, -0.002045086, -0.002878810, 0.046165984, 0.024858653), 
+                           theta = c(-1.2731792, -0.1666368, -0.2501280, -1.1441992, -0.6634130), n.ahead = 5, lastn = F, limits = T)
+
+
+ASE1 = mean((aapl.pred1$f - aapl.ts2[361:365])^2)
+ASE1 #53.289
+
+
+aapl.pred2 = fore.arma.wge(aapl.ts2, phi = c(-0.322309522, 1.057487180, -0.055477750, -0.844429717, 0.488404731, 0.610026678, -0.002045086, -0.002878810, 0.046165984, 0.024858653), 
+                           theta = c(-1.2731792, -0.1666368, -0.2501280, -1.1441992, -0.6634130), n.ahead = 30, lastn = T, limits = F)
+
+aapl.pred2.1 = fore.arma.wge(aapl.ts2, phi = c(-0.322309522, 1.057487180, -0.055477750, -0.844429717, 0.488404731, 0.610026678, -0.002045086, -0.002878810, 0.046165984, 0.024858653), 
+                           theta = c(-1.2731792, -0.1666368, -0.2501280, -1.1441992, -0.6634130), n.ahead = 30, lastn = F, limits = T)
+
+ASE2 = mean((aapl.pred2$f - aapl.ts2[336:365])^2)
+ASE2 #29.171
+
+
+#4.404
+roll.win.rmse.wge(aapl.ts2, horizon = 5, d=0, phi = c(-0.322309522, 1.057487180, -0.055477750, -0.844429717, 0.488404731, 0.610026678, -0.002045086, -0.002878810, 0.046165984, 0.024858653), 
+                  theta = c(-1.2731792, -0.1666368, -0.2501280, -1.1441992, -0.6634130))
+
+#10.142
+roll.win.rmse.wge(aapl.ts2, horizon = 30, d=0, phi = c(-0.322309522, 1.057487180, -0.055477750, -0.844429717, 0.488404731, 0.610026678, -0.002045086, -0.002878810, 0.046165984, 0.024858653), 
+                  theta = c(-1.2731792, -0.1666368, -0.2501280, -1.1441992, -0.6634130))
+
+```
+
+
+## Strategy
+The strategy going forward is to incorporate the additional variables into VAR and MLP models. We will investigate the importance of  difference stocks and look for possible groupings. Finally, we will dig deeper into the performance of the ARMA(10,5) vs the ARIMA(5,1). 
+
+
