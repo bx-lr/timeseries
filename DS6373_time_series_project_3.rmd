@@ -10,24 +10,16 @@ date: '2022-11-19'
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-```{r message=FALSE, warning=FALSE}
-# required libraries
-library(tswge)
-library(GGally)
-library(tidyverse)
-library(ggplot2)
-library(tseries)
-library(vars)
-library(forecast)
-library(dplyr)
-library(urca)
-library(orcutt)
-```
-
 ## Group Members
 Gowthan Katta
 Josh Mitchell
 
+## Project Information
+All project related files an documentation can be found at: 
+https://github.com/bx-lr/timeseries
+
+Presentation can be found at: 
+https://youtu.be/Wkc7MB5vu1U
 
 ## Data Description
 The data set consists of stock data between 2006-01-03 and 2022-11-14. The data was collected from 29 stocks and contains 123163 observagtions. The PerChange and PerSwing variables were generated from the data and Close was chosen as the response. No NA values were observed in the data set. Descriptions of the 10 variables contained within the data set are outlined below. 
@@ -44,6 +36,20 @@ The data set consists of stock data between 2006-01-03 and 2022-11-14. The data 
   PerSwing - Percentage change in stock price between High and Low. 
 
 As shown in the pair plots below, the explanatory variables High, Low, Open, Close, and Adj.Close are all highly correlated with each other. Additionally, when investigating the pair plots, different stock tickers appear to have different distributions of the data across the explanatory variables. This appears indicate that separate models (one for each stock ticker) may be appropriate. 
+
+```{r message=FALSE, warning=FALSE}
+# required libraries
+library(tswge)
+library(GGally)
+library(tidyverse)
+library(ggplot2)
+library(tseries)
+library(vars)
+library(forecast)
+library(dplyr)
+library(urca)
+library(orcutt)
+```
 
 ```{r message=FALSE, warning=FALSE}
 data  = read.csv('data/all_stocks_2006-01-01_to_2022-11-14.csv')
@@ -138,7 +144,6 @@ acf(aapl$PerSwing[1:length(aapl$PerSwing)/2], plot=T)
 acf(aapl$PerSwing[((length(aapl$PerSwing)/2)+1):length(aapl$PerSwing)], plot=T)
 adf.test(aapl$PerSwing) # falsely rejects Ho
 ```
-
 ## Model 1: ARIMA(5,1,1) - Restricted to last 365-day
 Top model is ARIMA(5,1,1). We factored out a 1-B term and performed a Dicky-Fuller test which suggested the data was stationary. Next, we selected the top models using the AIC and BIC. Each model was tested with the Ljung-Box test for whiteness of the residuals.  Afterwards, we calculated the rolling window RMSE for each model with both long and short term forecasts. The rolling window RMSE identified the ARIMA(5,1,1) model as performing the best. Inspecting the results, we generated a realization from the ARIMA(5,1,1) and compared it to the 365 day realization from the data set. Finally, we generated 5 and 30 day forecasts from the model.    
 
@@ -168,8 +173,7 @@ d1 = artrans.wge(slice, phi.tr=1)
 acf(d1)
 # inspect plots for stationarity
 
-## UNCOMMENT ME!!! had to remove so file could knit
-#adf.test(d1) # dicky-fuller rejects null, suggesting stationary
+adf.test(d1) # dicky-fuller rejects null, suggesting stationary
 
 # smallest AIC is 2.209449 with arma(6,3)
 #6,3 - 2.209449	
@@ -186,7 +190,7 @@ x73 = est.arma.wge(d1, p=7,q=3)
 x51 = est.arma.wge(d1, p=5,q=1)
 x102 = est.arma.wge(d1, p=10,q=2)
 x45 = est.arma.wge(d1, p=4,q=5)
-x121 =est.arma.wge(d3, p=12,q=1)
+x121 =est.arma.wge(d1, p=12,q=1)
 
 
 plot(x63$res, type='p') # inspect residuals for white noise
@@ -209,27 +213,26 @@ plot(x45$res, type='p') # inspect residuals for white noise
 ljung.wge(x45$res, p=6,q=3) # p-values for ljung-box test indicate residuals are sufficiently whitened
 ljung.wge(x45$res, p=6,q=3, K=48)
 
-### Uncomment ME!
-# forecasting Close 5 days in the future (best rmse 3.73 on arma(5,1))
-#roll.win.rmse.wge(slice, horizon=5, s=0, d=1,phi=x63$phi, theta = x63$theta) # rmse 6.151
-#roll.win.rmse.wge(slice, horizon=5, s=0, d=1,phi=x73$phi, theta = x73$theta) # rmse 5.676
-#roll.win.rmse.wge(slice, horizon=5, s=0, d=1,phi=x51$phi, theta = x51$theta) # rmse 4.455
-#roll.win.rmse.wge(slice, horizon=5, s=0, d=1,phi=x102$phi, theta = x102$theta) # rmse 5.649
-#roll.win.rmse.wge(slice, horizon=5, s=0, d=1,phi=x45$phi, theta = x45$theta) # rmse 4.864
-#fore_short = fore.arima.wge(slice, phi=x51$phi, theta = x51$theta, s=0, d=1, n.ahead=5, lastn=T, plot=T, limits=T)
-#fore_5day_ASE = mean((slice[361:365] - fore_short$f)^2)
-#fore_5day_ASE # 57.6851
 
-### Uncomment ME!
+# forecasting Close 5 days in the future (best rmse 3.73 on arma(5,1))
+roll.win.rmse.wge(slice, horizon=5, s=0, d=1,phi=x63$phi, theta = x63$theta) # rmse 6.151
+roll.win.rmse.wge(slice, horizon=5, s=0, d=1,phi=x73$phi, theta = x73$theta) # rmse 5.676
+roll.win.rmse.wge(slice, horizon=5, s=0, d=1,phi=x51$phi, theta = x51$theta) # rmse 4.455
+roll.win.rmse.wge(slice, horizon=5, s=0, d=1,phi=x102$phi, theta = x102$theta) # rmse 5.649
+roll.win.rmse.wge(slice, horizon=5, s=0, d=1,phi=x45$phi, theta = x45$theta) # rmse 4.864
+fore_short = fore.arima.wge(slice, phi=x51$phi, theta = x51$theta, s=0, d=1, n.ahead=5, lastn=T, plot=T, limits=T)
+fore_5day_ASE = mean((slice[361:365] - fore_short$f)^2)
+fore_5day_ASE # 57.6851
+
 # forecasting Close 30 days in the future (rmse 10.184)
-#roll.win.rmse.wge(slice, horizon=30, s=0, d=1,phi=x63$phi, theta = x63$theta) # rmse 10.678
-#roll.win.rmse.wge(slice, horizon=30, s=0, d=1,phi=x73$phi, theta = x73$theta) # rmse 10.521
-#roll.win.rmse.wge(slice, horizon=30, s=0, d=1,phi=x51$phi, theta = x51$theta) # rmse 10.184
-#roll.win.rmse.wge(slice, horizon=30, s=0, d=1,phi=x102$phi, theta = x102$theta) # rmse 10.259
-#roll.win.rmse.wge(slice, horizon=30, s=0, d=1,phi=x45$phi, theta = x45$theta) # rmse 10.283
-#fore_long = fore.arima.wge(slice, phi=x51$phi, theta = x51$theta, s=0, d=1, n.ahead=30, lastn=T, plot=T, limits=T)
-#fore_30_ASE = mean((slice[336:365] - fore_long$f)^2)
-#fore_30_ASE # 33.13971
+roll.win.rmse.wge(slice, horizon=30, s=0, d=1,phi=x63$phi, theta = x63$theta) # rmse 10.678
+roll.win.rmse.wge(slice, horizon=30, s=0, d=1,phi=x73$phi, theta = x73$theta) # rmse 10.521
+roll.win.rmse.wge(slice, horizon=30, s=0, d=1,phi=x51$phi, theta = x51$theta) # rmse 10.184
+roll.win.rmse.wge(slice, horizon=30, s=0, d=1,phi=x102$phi, theta = x102$theta) # rmse 10.259
+roll.win.rmse.wge(slice, horizon=30, s=0, d=1,phi=x45$phi, theta = x45$theta) # rmse 10.283
+fore_long = fore.arima.wge(slice, phi=x51$phi, theta = x51$theta, s=0, d=1, n.ahead=30, lastn=T, plot=T, limits=T)
+fore_30_ASE = mean((slice[336:365] - fore_long$f)^2)
+fore_30_ASE # 33.13971
 
 # generating data and comparing to original shows similar structure 
 plotts.sample.wge(d1)
