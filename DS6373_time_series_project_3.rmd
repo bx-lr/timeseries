@@ -11,6 +11,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ```{r message=FALSE, warning=FALSE}
+# required libraries
 library(tswge)
 library(GGally)
 library(tidyverse)
@@ -166,7 +167,9 @@ plotts.sample.wge(slice)
 d1 = artrans.wge(slice, phi.tr=1)
 acf(d1)
 # inspect plots for stationarity
-adf.test(d1) # dicky-fuller rejects null, suggesting stationary
+
+## UNCOMMENT ME!!! had to remove so file could knit
+#adf.test(d1) # dicky-fuller rejects null, suggesting stationary
 
 # smallest AIC is 2.209449 with arma(6,3)
 #6,3 - 2.209449	
@@ -206,26 +209,27 @@ plot(x45$res, type='p') # inspect residuals for white noise
 ljung.wge(x45$res, p=6,q=3) # p-values for ljung-box test indicate residuals are sufficiently whitened
 ljung.wge(x45$res, p=6,q=3, K=48)
 
-
+### Uncomment ME!
 # forecasting Close 5 days in the future (best rmse 3.73 on arma(5,1))
-roll.win.rmse.wge(slice, horizon=5, s=0, d=1,phi=x63$phi, theta = x63$theta) # rmse 6.151
-roll.win.rmse.wge(slice, horizon=5, s=0, d=1,phi=x73$phi, theta = x73$theta) # rmse 5.676
-roll.win.rmse.wge(slice, horizon=5, s=0, d=1,phi=x51$phi, theta = x51$theta) # rmse 4.455
-roll.win.rmse.wge(slice, horizon=5, s=0, d=1,phi=x102$phi, theta = x102$theta) # rmse 5.649
-roll.win.rmse.wge(slice, horizon=5, s=0, d=1,phi=x45$phi, theta = x45$theta) # rmse 4.864
-fore_short = fore.arima.wge(slice, phi=x51$phi, theta = x51$theta, s=0, d=1, n.ahead=5, lastn=T, plot=T, limits=T)
-fore_5day_ASE = mean((slice[361:365] - fore_short$f)^2)
-fore_5day_ASE # 57.6851
+#roll.win.rmse.wge(slice, horizon=5, s=0, d=1,phi=x63$phi, theta = x63$theta) # rmse 6.151
+#roll.win.rmse.wge(slice, horizon=5, s=0, d=1,phi=x73$phi, theta = x73$theta) # rmse 5.676
+#roll.win.rmse.wge(slice, horizon=5, s=0, d=1,phi=x51$phi, theta = x51$theta) # rmse 4.455
+#roll.win.rmse.wge(slice, horizon=5, s=0, d=1,phi=x102$phi, theta = x102$theta) # rmse 5.649
+#roll.win.rmse.wge(slice, horizon=5, s=0, d=1,phi=x45$phi, theta = x45$theta) # rmse 4.864
+#fore_short = fore.arima.wge(slice, phi=x51$phi, theta = x51$theta, s=0, d=1, n.ahead=5, lastn=T, plot=T, limits=T)
+#fore_5day_ASE = mean((slice[361:365] - fore_short$f)^2)
+#fore_5day_ASE # 57.6851
 
+### Uncomment ME!
 # forecasting Close 30 days in the future (rmse 10.184)
-roll.win.rmse.wge(slice, horizon=30, s=0, d=1,phi=x63$phi, theta = x63$theta) # rmse 10.678
-roll.win.rmse.wge(slice, horizon=30, s=0, d=1,phi=x73$phi, theta = x73$theta) # rmse 10.521
-roll.win.rmse.wge(slice, horizon=30, s=0, d=1,phi=x51$phi, theta = x51$theta) # rmse 10.184
-roll.win.rmse.wge(slice, horizon=30, s=0, d=1,phi=x102$phi, theta = x102$theta) # rmse 10.259
-roll.win.rmse.wge(slice, horizon=30, s=0, d=1,phi=x45$phi, theta = x45$theta) # rmse 10.283
-fore_long = fore.arima.wge(slice, phi=x51$phi, theta = x51$theta, s=0, d=1, n.ahead=30, lastn=T, plot=T, limits=T)
-fore_30_ASE = mean((slice[336:365] - fore_long$f)^2)
-fore_30_ASE # 33.13971
+#roll.win.rmse.wge(slice, horizon=30, s=0, d=1,phi=x63$phi, theta = x63$theta) # rmse 10.678
+#roll.win.rmse.wge(slice, horizon=30, s=0, d=1,phi=x73$phi, theta = x73$theta) # rmse 10.521
+#roll.win.rmse.wge(slice, horizon=30, s=0, d=1,phi=x51$phi, theta = x51$theta) # rmse 10.184
+#roll.win.rmse.wge(slice, horizon=30, s=0, d=1,phi=x102$phi, theta = x102$theta) # rmse 10.259
+#roll.win.rmse.wge(slice, horizon=30, s=0, d=1,phi=x45$phi, theta = x45$theta) # rmse 10.283
+#fore_long = fore.arima.wge(slice, phi=x51$phi, theta = x51$theta, s=0, d=1, n.ahead=30, lastn=T, plot=T, limits=T)
+#fore_30_ASE = mean((slice[336:365] - fore_long$f)^2)
+#fore_30_ASE # 33.13971
 
 # generating data and comparing to original shows similar structure 
 plotts.sample.wge(d1)
@@ -244,7 +248,9 @@ fore.arima.wge(slice, phi=x51$phi, theta = x51$theta, s=0, d=1, n.ahead=5, lastn
 fore.arima.wge(slice, phi=x51$phi, theta = x51$theta, s=0, d=1, n.ahead=30, lastn=F, plot=T, limits=T)
 ```
 ## Model 2: ARMA(10,5) - Utilizing All Days
- 
+For our Model 2, we wanted to perform an evaluation on the entire dataset. First, we performed an OLS fit on the Close and the Time. We found that the null hypothesis was rejected and that the time was found to be significant. Second, we used the previous OLS fit on a Cochrane-Orcutt test. We found that we failed to reject the null hypothesis, which meant that time did NOT appear to be significant. As such, there is a small chance (or evidence) of a deterministic trend in the data.
+
+Next, we evaluated the top AIC value and came upon our AR(10)MA(5) model. We used the parameters from the model and fit on the last 365 days (1 year) and found that our values were slightly smaller compared to the previous model in which we included a seasonal and deterministic value. 
 
 ```{r message=FALSE, warning=FALSE}
 

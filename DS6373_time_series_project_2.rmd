@@ -1,6 +1,9 @@
 ---
 title: 'Time Series Project EDA: Fall 2022'
-output: html_document
+output:
+  word_document: default
+  html_document: default
+  pdf_document: default
 date: '2022-11-19'
 ---
 
@@ -17,7 +20,7 @@ library(urca)
 library(orcutt)
 ```
 
-## Group Members:
+## Group Members
 Gowthan Katta
 Josh Mitchell
 
@@ -132,12 +135,12 @@ acf(aapl$PerSwing[((length(aapl$PerSwing)/2)+1):length(aapl$PerSwing)], plot=T)
 adf.test(aapl$PerSwing) # falsely rejects Ho
 ```
 
-## ARIMA Model 1
-Top model is ARIMA(5,1,1)
-
+## ARIMA Model 1 (365-day)
+Top model is ARIMA(5,1,1). We factored out a 1-B term and performed a Dicky-Fuller test which suggested the data was stationary. Next, we selected the top models using the AIC and BIC. Each model was tested with the Ljung-Box test for whiteness of the residuals.  Afterwards, we calculated the rolling window RMSE for each model with both long and short term forecasts. The rolling window RMSE identified the ARIMA(5,1,1) model as performing the best. Inspecting the results, we generated a realization from the ARIMA(5,1,1) and compared it to the 365 day realization from the data set. Finally, we generated 5 and 30 day forecasts from the model.    
 
 ```{r}
-plotts.sample.wge(aapl$Close)
+#plotts.sample.wge(aapl$Close)
+# take the last 365 days
 slice = aapl$Close[(length(aapl$Close)-364):length(aapl$Close)]
 # take out 1-b
 plotts.sample.wge(slice)
@@ -184,9 +187,7 @@ plot(x45$res, type='p') # inspect residuals for white noise
 ljung.wge(x45$res, p=6,q=3) # p-values for ljung-box test indicate residuals are sufficiently whitened
 ljung.wge(x45$res, p=6,q=3, K=48)
 
-# generating data and comparing to original shows similar structure 
-plotts.sample.wge(d1)
-plotts.sample.wge(gen.arma.wge(n=365, phi=x51$phi, theta = x51$theta, mu=x51$xbar, vara=x51$avar, sn=2))
+
 
 # forecasting Close 5 days in the future (best rmse 3.73 on arma(5,1))
 roll.win.rmse.wge(slice, horizon=5, s=0, d=1,phi=x63$phi, theta = x63$theta) # rmse 6.151
@@ -207,6 +208,10 @@ roll.win.rmse.wge(slice, horizon=30, s=0, d=1,phi=x45$phi, theta = x45$theta) # 
 fore_long = fore.arima.wge(slice, phi=x51$phi, theta = x51$theta, s=0, d=1, n.ahead=30, lastn=T, plot=T, limits=T)
 fore_30_ASE = mean((slice[336:365] - fore_long$f)^2)
 fore_30_ASE # 33.13971
+
+# generating data and comparing to original shows similar structure 
+plotts.sample.wge(d1)
+plotts.sample.wge(gen.arma.wge(n=365, phi=x51$phi, theta = x51$theta, mu=x51$xbar, vara=x51$avar, sn=2))
 
 x51
 #$phi
@@ -334,7 +339,7 @@ roll.win.rmse.wge(aapl.ts2, horizon = 30, d=0, phi = c(-0.322309522, 1.057487180
 
 
 ## Strategy
-The strategy going forward is to incorporate the additional variables into VAR and MLP models. 
+The strategy going forward is to incorporate the additional variables into VAR and MLP models. We will investigate the importance of  difference stocks and look for possible groupings. Finally, we will dig deeper into the performance of the ARMA(10,5) vs the ARIMA(5,1). 
 
 ```{r}
 aapl_High = aapl$High[(length(aapl$High)-364):length(aapl$High)]
