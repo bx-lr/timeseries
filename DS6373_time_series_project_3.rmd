@@ -374,7 +374,104 @@ roll.win.rmse.wge(aapl.ts2, horizon = 30, d=0, phi = c(-0.322309522, 1.057487180
 ```
 
 
-## Strategy
-The strategy going forward is to incorporate the additional variables into VAR and MLP models. We will investigate the importance of  difference stocks and look for possible groupings. Finally, we will dig deeper into the performance of the ARMA(10,5) vs the ARIMA(5,1). 
+### VAR Model
+For our VAR model, we evaluated the full data set for aapl stock with near and far-term horizons. The optimal model for near-term predictions incorporated first-difference lagged data on all of the explanatory variables. When this model was evaluated for far-term prediction accuracy, we identified significant performance degradation. Un-lagged data was then used for far-term model creation and forecasts. The un-lagged data was observed performing better in the long-term and the lagged data was observed performing better in the short-term.  
+
+
+```{r}
+# difference some of the data
+aapl_short_High.d1 = artrans.wge(aapl$High[1:4242], phi.tr = 1)
+aapl_short_Low.d1 = artrans.wge(aapl$Low[1:4242], phi.tr = 1)
+aapl_short_Open.d1 = artrans.wge(aapl$Open[1:4242], phi.tr = 1)
+aapl_short_AdjClose.d1 = artrans.wge(aapl$Adj.Close[1:4242], phi.tr = 1)
+aapl_short_Volume.d1 = artrans.wge(aapl$Volume[1:4242], phi.tr=1)
+aapl_short_PerChange.d1 = artrans.wge(aapl$PerChange[1:4242], phi.tr=1)
+aapl_short_PerSwing.d1 = artrans.wge(aapl$PerSwing[1:4242], phi.tr=1)
+
+#
+#5 day lag all but close
+#
+
+# varselect bic chooses p=5
+VARselect(cbind(aapl$Close[2:4242], aapl_short_Open.d1, aapl_short_High.d1, aapl_short_Low.d1, aapl_short_AdjClose.d1, aapl_short_Volume.d1, aapl_short_PerChange.d1, aapl_short_PerSwing.d1), lag.max=30, season=30, type='both' )
+
+# var with p=5
+aapl_5 = VAR(cbind(aapl$Close[2:4242], aapl_short_Open.d1, aapl_short_High.d1, aapl_short_Low.d1, aapl_short_AdjClose.d1, aapl_short_Volume.d1, aapl_short_PerChange.d1, aapl_short_PerSwing.d1), lag.max=30, season=30, type='both', p=5 )
+
+# get 5 day forecast
+preds_5day=predict(aapl_5,n.ahead=5)
+preds_5day
+
+plot(seq(1,360,1), aapl$Close[3883:4242], type = "l",xlim = c(0,365), ylab = "Close Price", main = "5 Day Forecast", xlab='Last Year in Days') + lines(seq(361,365,1), preds_5day$fcst$X[,1], type = "l", col = "red") + lines(seq(361,365,1), aapl$Close[4243:4247], type = 'l', col='black') + lines(seq(361,365,1), preds_5day$fcst$X[ ,3], lty = 'dashed', col = 'blue') + lines(seq(361,365,1), preds_5day$fcst$X[ ,2], lty = 'dashed', col = 'blue')
+
+ASE_5day = mean((aapl$Close[4243:4247] - preds_5day$fcst$X[,1])^2)
+ASE_5day # 47.076
+
+#
+# 30 day lag all but Close
+#
+
+# 30 day forecast
+aapl_long_High.d1 = artrans.wge(aapl$High[1:4217], phi.tr = 1)
+aapl_long_Low.d1 = artrans.wge(aapl$Low[1:4217], phi.tr = 1)
+aapl_long_Open.d1 = artrans.wge(aapl$Open[1:4217], phi.tr = 1)
+aapl_long_AdjClose.d1 = artrans.wge(aapl$Adj.Close[1:4217], phi.tr = 1)
+aapl_long_Volume.d1 = artrans.wge(aapl$Volume[1:4217], phi.tr=1)
+aapl_long_PerChange.d1 = artrans.wge(aapl$PerChange[1:4217], phi.tr=1)
+aapl_long_PerSwing.d1 = artrans.wge(aapl$PerSwing[1:4217], phi.tr=1)
+
+# varselect bic chooses p=17 
+VARselect(cbind(aapl$Close[2:4242], aapl_long_High.d1, aapl_long_Low.d1, aapl_long_Open.d1, aapl_long_AdjClose.d1, aapl_long_Volume.d1, aapl_long_PerChange.d1, aapl_long_PerSwing.d1), lag.max=30, season=30, type='both')
+
+aapl_30 = VAR(cbind(aapl$Close[2:4242], aapl_long_High.d1, aapl_long_Low.d1, aapl_long_Open.d1, aapl_long_AdjClose.d1, aapl_long_Volume.d1, aapl_long_PerChange.d1, aapl_long_PerSwing.d1), lag.max=30, season=30, type='both', p=17)
+
+
+# get 30 day predictions
+preds_30day=predict(aapl_30,n.ahead=30)
+preds_30day
+
+# plot predictions with original data
+plot(seq(1,335,1), aapl$Close[3883:4217], type = "l",xlim = c(0,365), ylim=c(10,200), ylab = "Close Price", main = "30 Day Forecast", xlab='Last Year in Days') + lines(seq(336,365,1), preds_30day$fcst$X[,1], type = "l", col = "red") + lines(seq(336,365,1), aapl$Close[4218:4247], type='l', col='blue')
+
+# calculate ase
+ASE_30day = mean((aapl$Close[4218:4247] - preds_30day$fcst$X[,1])^2)
+ASE_30day # 3171.503
+
+### no lag
+#
+# 5 day no lag
+#
+VARselect(cbind(aapl$Close[1:4242], aapl$Open[1:4242], aapl$High[1:4242], aapl$Low[1:4242], aapl$Adj.Close[1:4242], aapl$Volume[1:4242], aapl$PerChange[1:4242], aapl$PerSwing[1:4242]), lag.max=30, season=30, type='both' )
+
+# var with p=3
+aapl_nl_5 = VAR(cbind(aapl$Close[1:4242], aapl$Open[1:4242], aapl$High[1:4242], aapl$Low[1:4242], aapl$Adj.Close[1:4242], aapl$Volume[1:4242], aapl$PerChange[1:4242], aapl$PerSwing[1:4242]), lag.max=30, season=30, type='both', p=3 )
+
+preds_5day=predict(aapl_nl_5,n.ahead=5)
+
+plot(seq(1,360,1), aapl$Close[3883:4242], type = "l",xlim = c(0,365), ylab = "Close Price", main = "5 Day Forecast", xlab='Last Year in Days') + lines(seq(361,365,1), preds_5day$fcst$y1[,1], type = "l", col = "red") + lines(seq(361,365,1), aapl$Close[4243:4247], type = 'l', col='blue')
+
+ASE_5day = mean((aapl$Close[4243:4247] - preds_5day$fcst$y1[,1])^2)
+ASE_5day # 64.08639
+
+
+#
+# 30 day no lag
+#
+# varselect bic chooses p=2
+VARselect(cbind(aapl$Close[1:4217], aapl$Open[1:4217], aapl$High[1:4217], aapl$Low[1:4217], aapl$Adj.Close[1:4217], aapl$Volume[1:4217], aapl$PerChange[1:4217], aapl$PerSwing[1:4217]), lag.max=30, season=30, type='both' )
+
+# var with p=2
+aapl_nl_30 = VAR(cbind(aapl$Close[1:4217], aapl$Open[1:4217], aapl$High[1:4217], aapl$Low[1:4217], aapl$Adj.Close[1:4217], aapl$Volume[1:4217], aapl$PerChange[1:4217], aapl$PerSwing[1:4217]), lag.max=30, season=30, type='both', p=2 )
+
+# get 30 day predictions
+preds_30day=predict(aapl_nl_30,n.ahead=30)
+preds_30day
+# plot predictions with original data
+plot(seq(1,335,1), aapl$Close[3883:4217], type = "l",xlim = c(0,365), ylab = "Close Price", main = "30 Day Forecast", xlab='Last Year in Days') + lines(seq(336,365,1), preds_30day$fcst$y1[,1], type = "l", col = "red") + lines(seq(336,365,1), aapl$Close[4218:4247], type='l', col='black') + lines(seq(336,365,1), preds_30day$fcst$y1[ ,3], lty = 'dashed', col = 'blue') + lines(seq(336,365,1), preds_30day$fcst$y1[ ,2], lty = 'dashed', col = 'blue')
+
+# calculate ase
+ASE_30day = mean((aapl$Close[4218:4247] - preds_30day$fcst$y1[,1])^2)
+ASE_30day # 30.51524
+```
 
 
