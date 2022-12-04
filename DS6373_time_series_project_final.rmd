@@ -597,3 +597,8 @@ ASE
 ```
 ## Summary
 After comparing the models, we found that the MLP performed the best for the 5-Day Forecasts while the Ensemble performed the best for the 30-Day Forecasts. Although each model performed well, with different data these results could vary.
+
+Links:
+- https://youtu.be/iou3k6YS61c
+- https://github.com/bx-lr/timeseries
+
